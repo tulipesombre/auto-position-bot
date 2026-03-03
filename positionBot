@@ -2,7 +2,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const config = require('./config');
 
-class TSRBot {
+class PositionBot {
   constructor() {
     this.waitingTrades = [];      // S1/S2 en attente de CHOD
     this.activeTrades = {};       // Trades ouverts
@@ -335,7 +335,7 @@ class TSRBot {
 
     try {
       await axios.post(config.discord.webhookUrl, {
-        username: 'TSR Bot',
+        username: 'Position Bot',
         embeds: [{
           title: data.title,
           color: parseInt(data.color || 'ffffff', 16),
@@ -357,4 +357,4 @@ class TSRBot {
   }
 }
 
-module.exports = TSRBot;
+module.exports = PositionBot;

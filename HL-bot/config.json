@@ -1,0 +1,16 @@
+{
+  "capital": 1000.0,
+  "risk_pct": 1.0,
+  "r_target": 2.0,
+  "sl_type": "structural",
+  "setups": "both",
+  "assets": {
+    "BTC": true,
+    "ETH": true,
+    "SOL": true,
+    "HYPE": true
+  },
+  "dr_filter": "off",
+  "max_leverage": 40,
+  "bot_active": true
+}

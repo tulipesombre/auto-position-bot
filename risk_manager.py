@@ -9,6 +9,7 @@ TICKER_MAP = {
     "ETHUSDT.P":  "ETH",
     "SOLUSDT.P":  "SOL",
     "HYPEUSDT.P": "HYPE",
+    "BNBUSDT.P": "BNB", 
 }
 
 # Coin size precision (decimal places) and minimum size on Hyperliquid
@@ -17,6 +18,7 @@ COIN_PRECISION = {
     "ETH":  4,
     "SOL":  2,
     "HYPE": 1,
+    "BNB": 3,
 }
 
 COIN_MIN_SIZE = {
@@ -24,6 +26,7 @@ COIN_MIN_SIZE = {
     "ETH":  0.001,
     "SOL":  0.1,
     "HYPE": 1.0,
+    "BNB": 0.01,
 }
 
 

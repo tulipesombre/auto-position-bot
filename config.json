@@ -9,7 +9,7 @@
     "ETH": true,
     "SOL": true,
     "HYPE": true,
-    "BNB": true,
+    "BNB": true
   },
   "dr_filter": "off",
   "max_leverage": 40,

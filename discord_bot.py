@@ -201,6 +201,7 @@ async def config_show(interaction: discord.Interaction):
     embed.add_field(name="📋 Setups",      value=cfg["setups"],                                inline=True)
     embed.add_field(name="🔺 DR Filter",   value=cfg["dr_filter"],                             inline=True)
     embed.add_field(name="⚡ Levier max",  value=f"{cfg.get('max_leverage', 40)}x",            inline=True)
+    embed.add_field(name="🎯 Entry mode",  value=cfg.get("entry_mode", "touch"),              inline=True)
     embed.add_field(name="🔛 Bot",         value="✅ Actif" if cfg["bot_active"] else "⏸️ Pause", inline=True)
     embed.add_field(name="📡 Assets",      value=assets,                                       inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -216,6 +217,7 @@ async def config_show(interaction: discord.Interaction):
     app_commands.Choice(name="setups (S1 / S2 / both)",       value="setups"),
     app_commands.Choice(name="dr_filter (off/soft/strict)",   value="dr_filter"),
     app_commands.Choice(name="max_leverage",                  value="max_leverage"),
+    app_commands.Choice(name="entry_mode (touch / close)",   value="entry_mode"),
 ])
 async def set_param(interaction: discord.Interaction, param: str, value: str):
     from config_manager import set_val
@@ -224,6 +226,7 @@ async def set_param(interaction: discord.Interaction, param: str, value: str):
         "sl_type":   ["structural", "chod"],
         "setups":    ["S1", "S2", "both"],
         "dr_filter": ["off", "soft", "strict"],
+        "entry_mode": ["touch", "close"],
     }
     try:
         if param in NUMERIC:

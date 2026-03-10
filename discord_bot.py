@@ -19,6 +19,7 @@ ASSET_CHANNELS = {
     "ETH":  int(os.environ.get("DISCORD_CHANNEL_ETH",  0)),
     "SOL":  int(os.environ.get("DISCORD_CHANNEL_SOL",  0)),
     "HYPE": int(os.environ.get("DISCORD_CHANNEL_HYPE", 0)),
+    "BNB":  int(os.environ.get("DISCORD_CHANNEL_BNB", 0)),
 }
 
 def get_channel_for_ticker(ticker: str):
@@ -239,6 +240,7 @@ async def set_param(interaction: discord.Interaction, param: str, value: str):
     app_commands.Choice(name="ETH",  value="ETH"),
     app_commands.Choice(name="SOL",  value="SOL"),
     app_commands.Choice(name="HYPE", value="HYPE"),
+    app_commands.Choice(name="BNB",  value="BNB"),
 ])
 async def toggle_asset(interaction: discord.Interaction, asset: str):
     from config_manager import load, save

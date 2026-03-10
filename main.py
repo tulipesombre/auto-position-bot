@@ -23,10 +23,8 @@ def run_flask(loop: asyncio.AbstractEventLoop):
 
 async def start():
     import discord_bot as db
+    loop = asyncio.get_running_loop()  # ← était get_event_loop()
 
-    loop = asyncio.get_event_loop()
-
-    # Flask dans un thread daemon
     flask_thread = threading.Thread(target=run_flask, args=(loop,), daemon=True)
     flask_thread.start()
 

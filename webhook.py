@@ -13,7 +13,7 @@ app = Flask(__name__)
 def _parse_footer(payload: dict) -> dict:
     """
     Extrait event, setup, ticker depuis le footer.
-    Format : "event: ENTRY | S1 | BTCUSDT.P"
+    Format : "event: CHOD_TOUCH | S1 | BTCUSDT.P"
     """
     try:
         footer = payload["embeds"][0]["footer"]["text"]
@@ -41,6 +41,81 @@ def _get_field(payload: dict, name: str) -> str:
     return ""
 
 
+def _execute_trade(payload, meta, db):
+    """
+    Logique commune d'exécution trade — utilisée par CHOD_TOUCH (mode touch)
+    et ENTRY_CLOSE (mode close).
+    """
+    from risk_manager import should_trade, calc_position, round_size, get_coin
+    from hyperliquid_client import get_balance, open_trade
+    from config_manager import load
+
+    setup     = meta.get("setup", "")
+    ticker    = meta.get("ticker", "")
+    direction = _get_field(payload, "Direction")
+    is_long   = direction == "LONG"
+    dr_detail = _get_field(payload, "DR Detail")
+    cfg       = load()
+
+    # Choix du SL selon config
+    if cfg["sl_type"] == "structural":
+        sl_raw = _get_field(payload, "SL_Struct")
+    else:
+        sl_raw = _get_field(payload, "SL_Chod") or _get_field(payload, "SL_Struct")
+
+    # Entry price : champ "Entry" si présent (ENTRY_CLOSE), sinon "Niveau" (CHOD_TOUCH)
+    entry_raw   = _get_field(payload, "Entry") or _get_field(payload, "Niveau")
+    entry_price = float(entry_raw)
+    sl_price    = float(sl_raw)
+
+    # Vérification des conditions de trade
+    ok, reason = should_trade(setup, ticker, dr_detail)
+    if not ok:
+        logger.info(f"Trade bloqué : {reason}")
+        if db.bot_loop:
+            asyncio.run_coroutine_threadsafe(
+                db.send_trade_blocked(reason, ticker, setup, direction),
+                db.bot_loop
+            )
+        return jsonify({"status": "blocked", "reason": reason}), 200
+
+    # Calcul de la position
+    coin    = get_coin(ticker)
+    balance = get_balance()
+    calc    = calc_position(entry_price, sl_price, balance)
+    size    = round_size(coin, calc["size_raw"])
+
+    logger.info(
+        f"Trade {coin} {direction} | entry={entry_price} sl={sl_price} "
+        f"tp={calc['tp']:.4f} size={size} lev={calc['leverage']}x"
+    )
+
+    # Ouverture du trade sur Hyperliquid
+    result = open_trade(
+        coin, is_long, size,
+        calc["leverage"], sl_price, calc["tp"]
+    )
+
+    if result["success"]:
+        pos = {"fill_price": result["fill_price"], "is_long": is_long}
+        trade_info = {"coin": coin, "setup": setup, "ticker": ticker}
+        if db.bot_loop:
+            asyncio.run_coroutine_threadsafe(
+                db.send_trade_opened(trade_info, pos, calc),
+                db.bot_loop
+            )
+        return jsonify({"status": "executed", "coin": coin}), 200
+
+    else:
+        msg = f"Trade échoué sur {coin} : {result.get('error')}"
+        logger.error(msg)
+        if db.bot_loop:
+            asyncio.run_coroutine_threadsafe(
+                db.send_error(msg), db.bot_loop
+            )
+        return jsonify({"status": "error", "error": msg}), 500
+
+
 # ════════════════════════════════════════════════════════════
 # ROUTES
 # ════════════════════════════════════════════════════════════
@@ -53,8 +128,6 @@ def health():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     import discord_bot as db
-    from risk_manager import should_trade, calc_position, round_size, get_coin
-    from hyperliquid_client import get_balance, open_trade
     from config_manager import load
 
     try:
@@ -66,7 +139,7 @@ def webhook():
         event  = meta.get("event", "")
         logger.info(f"Webhook reçu — event: {event} | meta: {meta}")
 
-        # ── SETUP_ARMED : forward Discord tel quel ─────────────────
+        # ── SETUP_ARMED : forward Discord tel quel ──────────────────
         if event == "SETUP_ARMED":
             ticker = meta.get("ticker", "")
             if db.bot_loop:
@@ -75,70 +148,35 @@ def webhook():
                 )
             return jsonify({"status": "forwarded"}), 200
 
-        # ── ENTRY : exécuter le trade ───────────────────────────────
-        elif event == "ENTRY":
-            setup     = meta.get("setup", "")
-            ticker    = meta.get("ticker", "")
-            direction = _get_field(payload, "Direction")
-            is_long   = direction == "LONG"
-            dr_detail = _get_field(payload, "DR Detail")
-            cfg       = load()
+        # ── CHOD_TOUCH : trade si entry_mode = touch ────────────────
+        elif event == "CHOD_TOUCH":
+            cfg = load()
+            entry_mode = cfg.get("entry_mode", "touch")
 
-            # Choix du SL selon config
-            if cfg["sl_type"] == "structural":
-                sl_raw = _get_field(payload, "SL_Struct")
+            if entry_mode == "touch":
+                logger.info("CHOD_TOUCH reçu — entry_mode=touch → exécution trade")
+                return _execute_trade(payload, meta, db)
             else:
-                sl_raw = _get_field(payload, "SL_Chod") or _get_field(payload, "SL_Struct")
-
-            entry_price = float(_get_field(payload, "Entry"))
-            sl_price    = float(sl_raw)
-
-            # Vérification des conditions de trade
-            ok, reason = should_trade(setup, ticker, dr_detail)
-            if not ok:
-                logger.info(f"Trade bloqué : {reason}")
+                # mode close : on forward juste sur Discord pour info
+                logger.info("CHOD_TOUCH reçu — entry_mode=close → forwarding Discord uniquement")
+                ticker = meta.get("ticker", "")
                 if db.bot_loop:
                     asyncio.run_coroutine_threadsafe(
-                        db.send_trade_blocked(reason, ticker, setup, direction),
-                        db.bot_loop
+                        db.send_setup_armed(payload, ticker), db.bot_loop
                     )
-                return jsonify({"status": "blocked", "reason": reason}), 200
+                return jsonify({"status": "forwarded_touch_info"}), 200
 
-            # Calcul de la position
-            coin    = get_coin(ticker)
-            balance = get_balance()
-            calc    = calc_position(entry_price, sl_price, balance)
-            size    = round_size(coin, calc["size_raw"])
+        # ── ENTRY_CLOSE : trade si entry_mode = close ───────────────
+        elif event == "ENTRY_CLOSE":
+            cfg = load()
+            entry_mode = cfg.get("entry_mode", "touch")
 
-            logger.info(
-                f"Trade {coin} {direction} | entry={entry_price} sl={sl_price} "
-                f"tp={calc['tp']:.4f} size={size} lev={calc['leverage']}x"
-            )
-
-            # Ouverture du trade sur Hyperliquid
-            result = open_trade(
-                coin, is_long, size,
-                calc["leverage"], sl_price, calc["tp"]
-            )
-
-            if result["success"]:
-                pos = {"fill_price": result["fill_price"], "is_long": is_long}
-                trade_info = {"coin": coin, "setup": setup, "ticker": ticker}
-                if db.bot_loop:
-                    asyncio.run_coroutine_threadsafe(
-                        db.send_trade_opened(trade_info, pos, calc),
-                        db.bot_loop
-                    )
-                return jsonify({"status": "executed", "coin": coin}), 200
-
+            if entry_mode == "close":
+                logger.info("ENTRY_CLOSE reçu — entry_mode=close → exécution trade")
+                return _execute_trade(payload, meta, db)
             else:
-                msg = f"Trade échoué sur {coin} : {result.get('error')}"
-                logger.error(msg)
-                if db.bot_loop:
-                    asyncio.run_coroutine_threadsafe(
-                        db.send_error(msg), db.bot_loop
-                    )
-                return jsonify({"status": "error", "error": msg}), 500
+                logger.info("ENTRY_CLOSE reçu — entry_mode=touch → ignoré")
+                return jsonify({"status": "ignored_wrong_mode"}), 200
 
         else:
             logger.warning(f"Événement inconnu : '{event}'")

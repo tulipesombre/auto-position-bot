@@ -24,7 +24,9 @@ def _clients():
 def get_balance() -> float:
     _, info, address = _clients()
     state = info.user_state(address)
-    # Unified account → crossMarginSummary, sinon marginSummary
+    logger.info(f"DEBUG user_state keys: {list(state.keys())}")
+    logger.info(f"DEBUG marginSummary: {state.get('marginSummary')}")
+    logger.info(f"DEBUG crossMarginSummary: {state.get('crossMarginSummary')}")
     summary = state.get("crossMarginSummary") or state.get("marginSummary", {})
     return float(summary.get("accountValue", 0))
 

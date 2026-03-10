@@ -13,5 +13,6 @@
   },
   "dr_filter": "off",
   "max_leverage": 40,
-  "bot_active": true
+  "bot_active": true,
+  "entry_mode": "touch"
 }

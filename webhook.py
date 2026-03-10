@@ -68,9 +68,10 @@ def webhook():
 
         # ── SETUP_ARMED : forward Discord tel quel ─────────────────
         if event == "SETUP_ARMED":
+            ticker = meta.get("ticker", "")
             if db.bot_loop:
                 asyncio.run_coroutine_threadsafe(
-                    db.send_setup_armed(payload), db.bot_loop
+                    db.send_setup_armed(payload, ticker), db.bot_loop
                 )
             return jsonify({"status": "forwarded"}), 200
 

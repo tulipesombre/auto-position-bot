@@ -10,7 +10,23 @@ logger = logging.getLogger(__name__)
 # Partagé avec main.py et webhook.py pour run_coroutine_threadsafe
 bot_loop: asyncio.AbstractEventLoop | None = None
 
-CHANNEL_ID = int(os.environ.get("DISCORD_CHANNEL_ID", 0))
+# Channel par défaut (trades ouverts, notifs bot)
+CHANNEL_ID = int(os.environ.get("DISCORD_CHANNEL_DEFAULT", os.environ.get("DISCORD_CHANNEL_ID", 0)))
+
+# Channels par asset pour les SETUP_ARMED (même layout que tes channels actuels)
+ASSET_CHANNELS = {
+    "BTC":  int(os.environ.get("DISCORD_CHANNEL_BTC",  0)),
+    "ETH":  int(os.environ.get("DISCORD_CHANNEL_ETH",  0)),
+    "SOL":  int(os.environ.get("DISCORD_CHANNEL_SOL",  0)),
+    "HYPE": int(os.environ.get("DISCORD_CHANNEL_HYPE", 0)),
+}
+
+def get_channel_for_ticker(ticker: str):
+    """Retourne le channel Discord pour un ticker donné, ou le channel par défaut."""
+    for coin, ch_id in ASSET_CHANNELS.items():
+        if coin in ticker.upper() and ch_id:
+            return bot.get_channel(ch_id)
+    return bot.get_channel(CHANNEL_ID)
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -86,11 +102,11 @@ class TradeView(discord.ui.View):
 # FONCTIONS D'ENVOI (appelées depuis webhook.py via threadsafe)
 # ════════════════════════════════════════════════════════════
 
-async def send_setup_armed(payload: dict):
-    """Forward le payload SETUP_ARMED vers Discord tel quel."""
-    channel = bot.get_channel(CHANNEL_ID)
+async def send_setup_armed(payload: dict, ticker: str = ""):
+    """Forward le payload SETUP_ARMED vers le channel Discord dédié à l asset."""
+    channel = get_channel_for_ticker(ticker) if ticker else bot.get_channel(CHANNEL_ID)
     if not channel:
-        logger.error(f"Channel {CHANNEL_ID} introuvable")
+        logger.error(f"Channel introuvable pour ticker={ticker}")
         return
     try:
         data = payload["embeds"][0]

@@ -1,4 +1,4 @@
-# Auto Position Bot — C2 & CHOD + DR
+# Auto Position Bot
 
 Bot de trading automatisé pour Hyperliquid, piloté par des alertes TradingView.
 
@@ -45,7 +45,7 @@ TradingView (PineScript M5)
 
 Pour chaque asset crypto (BTC, ETH, SOL, HYPE) :
 
-1. Sur le chart M5 avec l'indicateur C2 & CHOD + DR
+1. Sur le chart M5 avec l'indicateur
 2. Créer une alerte → "Tout appel de la fonction alerte()"
 3. Dans "Notifications" → activer Webhook
 4. URL du webhook : `https://auto-position-bot-production.up.railway.app/webhook`

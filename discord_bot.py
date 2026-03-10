@@ -49,7 +49,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     global bot_loop
-    bot_loop = asyncio.get_running_loop()  # ← était get_event_loop()
     logger.info(f"Discord connecté : {bot.user}")
     try:
         synced = await bot.tree.sync()

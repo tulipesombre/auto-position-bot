@@ -8,11 +8,11 @@ DEFAULT_MIN_SIZE  = 0.001
 
 KNOWN_PRECISION = {
     "BTC": 5, "ETH": 4, "SOL": 2, "HYPE": 1, "BNB": 3, "XRP": 4,
-    "XYZ100": 3, "USA500": 2, "GC": 2, "SI": 2, "CL": 2,
+    "XYZ100": 3, "USA500": 2, "GC": 2, "SI": 2, "CL": 2, "EUR": 4,
 }
 KNOWN_MIN_SIZE = {
     "BTC": 0.0001, "ETH": 0.001, "SOL": 0.1, "HYPE": 1.0, "BNB": 0.01, "XRP": 1.0,
-    "XYZ100": 0.001, "USA500": 0.01, "GC": 0.01, "SI": 0.1, "CL": 0.1,
+    "XYZ100": 0.001, "USA500": 0.01, "GC": 0.01, "SI": 0.1, "CL": 0.1, "EUR": 1.0,
 }
 
 def get_coin(ticker: str) -> str:

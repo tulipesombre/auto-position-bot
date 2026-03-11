@@ -176,3 +176,8 @@ def close_position(coin: str) -> dict:
         open_orders.pop(coin, None)
         return {"success": True}
     return {"success": False, "error": result}
+
+def get_mid_price(coin: str) -> float:
+    _, info, _ = _clients()
+    mids = info.all_mids()
+    return float(mids[coin])

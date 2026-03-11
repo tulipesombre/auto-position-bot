@@ -9,10 +9,22 @@
     "ETH": true,
     "SOL": true,
     "HYPE": true,
-    "BNB": true
+    "BNB": true,
+    "XRP": true
   },
   "dr_filter": "off",
   "max_leverage": 40,
   "bot_active": true,
-  "entry_mode": "touch"
+  "entry_mode": "touch",
+  "ticker_map": {
+    "BTCUSDT.P": "BTC",
+    "ETHUSDT.P": "ETH",
+    "SOLUSDT.P": "SOL",
+    "HYPEUSDT.P": "HYPE",
+    "BNBUSDT.P": "BNB",
+    "XRPUSDT.P": "XRP"
+  },
+  "asset_channels": {},
+  "coin_precision": {},
+  "coin_min_size": {}
 }

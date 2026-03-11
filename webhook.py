@@ -120,18 +120,28 @@ def _execute_trade(payload, meta, db):
 # ROUTES
 # ════════════════════════════════════════════════════════════
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"}), 200
-
-
 @app.route("/webhook", methods=["POST"])
 def webhook():
     import discord_bot as db
     from config_manager import load
+    import re
+    import json as json_module
 
-import re
-import json as json_module
+    try:
+        payload = request.get_json(force=True, silent=True)
+        if not payload:
+            raw = request.get_data(as_text=True)
+            logger.error(f"JSON invalide reçu: {raw[:500]}")
+            fixed = re.sub(r'(\d),(\d)', r'\1.\2', raw)
+            try:
+                payload = json_module.loads(fixed)
+            except Exception:
+                return jsonify({"error": "payload JSON invalide"}), 400
+        if not payload:
+            return jsonify({"error": "payload vide"}), 400
+
+        meta   = _parse_footer(payload)
+        # ... reste inchangé
 
 payload = request.get_json(force=True, silent=True)
 if not payload:

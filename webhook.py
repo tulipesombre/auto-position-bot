@@ -130,10 +130,20 @@ def webhook():
     import discord_bot as db
     from config_manager import load
 
+import re
+import json as json_module
+
+payload = request.get_json(force=True, silent=True)
+if not payload:
+    raw = request.get_data(as_text=True)
+    logger.error(f"JSON invalide reçu: {raw[:500]}")
+    fixed = re.sub(r'(\d),(\d)', r'\1.\2', raw)
     try:
-        payload = request.get_json(force=True)
-        if not payload:
-            return jsonify({"error": "payload vide"}), 400
+        payload = json_module.loads(fixed)
+    except Exception:
+        return jsonify({"error": "payload JSON invalide"}), 400
+if not payload:
+    return jsonify({"error": "payload vide"}), 400
 
         meta   = _parse_footer(payload)
         event  = meta.get("event", "")

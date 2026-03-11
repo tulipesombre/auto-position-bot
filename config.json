@@ -5,25 +5,20 @@
   "sl_type": "structural",
   "setups": "both",
   "assets": {
-    "BTC": true,
-    "ETH": true,
-    "SOL": true,
-    "HYPE": true,
-    "BNB": true,
-    "XRP": true
-  },
+    "BTC": true, "ETH": true, "SOL": true, "HYPE": true,
+    "BNB": true, "XRP": true,
+    "XYZ100": true, "USA500": true, "GC": true, "SI": true, "CL": true
+},
   "dr_filter": "off",
   "max_leverage": 40,
   "bot_active": true,
   "entry_mode": "touch",
   "ticker_map": {
-    "BTCUSDT.P": "BTC",
-    "ETHUSDT.P": "ETH",
-    "SOLUSDT.P": "SOL",
-    "HYPEUSDT.P": "HYPE",
-    "BNBUSDT.P": "BNB",
-    "XRPUSDT.P": "XRP"
-  },
+    "BTCUSDT.P": "BTC", "ETHUSDT.P": "ETH", "SOLUSDT.P": "SOL",
+    "HYPEUSDT.P": "HYPE", "BNBUSDT.P": "BNB", "XRPUSDT.P": "XRP",
+    "XYZ100USDT.P": "XYZ100", "USA500USDT.P": "USA500",
+    "GCUSDT.P": "GC", "SIUSDT.P": "SI", "CLUSDT.P": "CL"
+}
   "asset_channels": {},
   "coin_precision": {},
   "coin_min_size": {}

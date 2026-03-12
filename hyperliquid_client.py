@@ -8,11 +8,22 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.hyperliquid.xyz"
 
-# Coins TradFi — tradés via HIP-3 perpetuals sur le DEX "xyz"
-TRADFI_COINS = {"SILVER", "GOLD", "CL", "XYZ100", "USA500", "EUR"}
-
 # Nom du DEX HIP-3 hébergeant les TradFi sur Hyperliquid
 HIP3_DEX = "xyz"
+
+# Coins TradFi disponibles sur le DEX xyz (vérifiés via metaAndAssetCtxs)
+# USA500 (ES1!) n'existe pas sur xyz → retiré, alerte Discord uniquement
+TRADFI_COINS = {"SILVER", "GOLD", "CL", "XYZ100", "EUR"}
+
+# Leverage maximum réel par coin HIP-3 (source : API metaAndAssetCtxs)
+# Evite l'erreur "Invalid leverage value" si max_leverage config > max coin
+HIP3_MAX_LEVERAGE = {
+    "XYZ100": 30,
+    "GOLD":   25,
+    "SILVER": 25,
+    "CL":     20,
+    "EUR":    50,
+}
 
 # Stockage OIDs SL/TP en mémoire (perdu au redémarrage)
 open_orders: dict = {}
@@ -201,6 +212,9 @@ def _open_trade_hip3(coin: str, is_long: bool, size: float, leverage: int,
     if not entry_price or entry_price <= 0:
         entry_price = _hip3_mid_price(coin, info)
 
+    # Capper le levier au maximum autorisé par le coin sur le DEX xyz
+    max_lev    = HIP3_MAX_LEVERAGE.get(coin, 20)
+    leverage   = min(leverage, max_lev)
     lev_result = exchange.update_leverage(leverage, hip3_coin, is_cross=False)
     logger.info(f"Levier HIP-3 {coin} ({hip3_coin}): {lev_result}")
 

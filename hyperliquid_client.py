@@ -194,13 +194,15 @@ def close_position(coin: str) -> dict:
 def get_mid_price(coin: str) -> float:
     _, info, _ = _clients()
 
-    # Essai 1 : all_mids (crypto perps)
     mids = info.all_mids()
     if coin in mids:
         return float(mids[coin])
 
-    # Essai 2 : meta_and_asset_ctxs (TradFi)
     meta, asset_ctxs = info.meta_and_asset_ctxs()
+    # Log temporaire — à supprimer après
+    all_names = [a["name"] for a in meta["universe"]]
+    logger.info(f"Assets universe: {[n for n in all_names if any(x in n.upper() for x in ['SIL','GOLD','OIL','EUR','XYZ','USA'])]}")
+
     for i, asset in enumerate(meta["universe"]):
         if asset["name"] == coin:
             ctx = asset_ctxs[i]

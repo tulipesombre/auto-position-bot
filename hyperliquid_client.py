@@ -193,24 +193,26 @@ def close_position(coin: str) -> dict:
 
 def get_mid_price(coin: str) -> float:
     _, info, _ = _clients()
+    import requests
 
-    # Essai 1 : all_mids (crypto perps)
     mids = info.all_mids()
     if coin in mids:
         return float(mids[coin])
 
-    # Essai 2 : spot market (TradFi sur HL)
-    import requests
     resp = requests.post(
         f"{BASE_URL}/info",
         json={"type": "spotMetaAndAssetCtxs"},
         headers={"Content-Type": "application/json"}
     )
-    data = resp.json()
-    spot_meta = data[0]
-    spot_ctxs = data[1]
+    spot_data = resp.json()
+    spot_meta = spot_data[0]
 
-    logger.info(f"Tokens: {[t.get('name') for t in spot_meta.get('tokens', [])]}")
-    logger.info(f"Markets: {[m.get('name') for m in spot_meta.get('universe', [])]}")
+    tokens = spot_meta.get("tokens", [])
+    universe = spot_meta.get("universe", [])
+    
+    # Log pour trouver SILVER
+    silver_tokens = [t for t in tokens if "SIL" in str(t).upper() or "GOLD" in str(t).upper() or "XYZ" in str(t).upper()]
+    logger.info(f"Tokens TradFi: {silver_tokens[:10]}")
+    logger.info(f"Universe (5 premiers): {universe[:5]}")
 
-    raise KeyError(f"Coin '{coin}' introuvable — voir logs")
+    raise KeyError(f"Debug — voir logs")

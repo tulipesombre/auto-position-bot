@@ -187,13 +187,10 @@ def _open_trade_spot(coin: str, is_long: bool, size: float, leverage: int,
     lev_result = exchange.update_leverage(leverage, market_id, is_cross=False)
     logger.info(f"Levier spot {coin} ({market_id}): {lev_result}")
 
-if entry_price and entry_price > 0:
-    mid = entry_price
-else:
-    raise ValueError(f"Prix introuvable pour {coin} — spécifie le paramètre entry manuellement")
-
-slippage  = 0.002  # 0.2% — juste assez pour être agressif
-limit_px  = round(mid * (1 + slippage) if is_long else mid * (1 - slippage), 2)
+    if not entry_price or entry_price <= 0:
+        raise ValueError(f"Prix introuvable pour {coin} — spécifie le paramètre entry manuellement")
+    mid      = entry_price
+    limit_px = round(mid * 1.002 if is_long else mid * 0.998, 2)
 
     market_result = exchange.order(
         market_id, is_long, size, limit_px,
@@ -320,9 +317,11 @@ def close_position(coin: str) -> dict:
 def get_mid_price(coin: str) -> float:
     _, info, _ = _clients()
     mids = info.all_mids()
+
     # Crypto perps
     if coin in mids:
         return float(mids[coin])
+
     # TradFi — prix doit être fourni manuellement
     if coin in TRADFI_COINS:
         raise KeyError(f"Coin '{coin}' est TradFi — spécifie le prix entry manuellement")

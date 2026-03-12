@@ -327,8 +327,4 @@ def get_mid_price(coin: str) -> float:
 
     # TradFi spot via @N
     if coin in TRADFI_COINS:
-        market_id = _find_spot_market_id(coin)
-        if market_id in mids:
-            return float(mids[market_id])
-
-    raise KeyError(f"Coin '{coin}' introuvable sur Hyperliquid")
+    raise KeyError(f"Coin '{coin}' est TradFi — spécifie le prix entry manuellement")

@@ -17,8 +17,6 @@
   "ticker_map": {
     "BTCUSDT.P": "BTC", "ETHUSDT.P": "ETH", "SOLUSDT.P": "SOL",
     "HYPEUSDT.P": "HYPE", "BNBUSDT.P": "BNB", "XRPUSDT.P": "XRP",
-    "XYZ100USDT.P": "XYZ100", "USA500USDT.P": "USA500",
-    "GCUSDT.P": "GOLD", "SIUSDT.P": "SILVER", "CLUSDT.P": "CL",
     "SI1!": "SILVER", "GC1!": "GOLD", "CL1!": "CL",
     "NQ1!": "XYZ100", "ES1!": "USA500",
     "6E1!": "EUR"

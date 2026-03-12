@@ -1,6 +1,5 @@
 import os
 import logging
-import requests
 import eth_account
 from hyperliquid.exchange import Exchange
 from hyperliquid.info import Info
@@ -9,34 +8,33 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.hyperliquid.xyz"
 
-# Coins TradFi — tradés via les marchés spot @N sur HL
+# Coins TradFi — tradés via HIP-3 perpetuals sur le DEX "xyz"
 TRADFI_COINS = {"SILVER", "GOLD", "CL", "XYZ100", "USA500", "EUR"}
 
-# Noms des tokens spot HL pour chaque coin TradFi
-TRADFI_TOKEN_ALIASES = {
-    "SILVER": ["SLV", "SILVER"],
-    "GOLD":   ["GLD", "GOLD"],
-    "XYZ100": ["NQ", "XYZ100", "NASDAQ"],
-    "USA500": ["ES", "USA500", "SPY", "SP500"],
-    "CL":     ["CL", "OIL", "CRUDE"],
-    "EUR":    ["EUR"],
-}
+# Nom du DEX HIP-3 hébergeant les TradFi sur Hyperliquid
+HIP3_DEX = "xyz"
 
-# Cache coin → @N
-_spot_market_cache: dict = {}
-
-# Stockage OIDs SL/TP en mémoire
+# Stockage OIDs SL/TP en mémoire (perdu au redémarrage)
 open_orders: dict = {}
 
 
 def _clients():
-    pk       = os.environ["HL_PRIVATE_KEY"]
-    account  = eth_account.Account.from_key(pk)
-    exchange = Exchange(account, base_url=BASE_URL)
-    info     = Info(base_url=BASE_URL, skip_ws=True)
+    pk           = os.environ["HL_PRIVATE_KEY"]
+    account      = eth_account.Account.from_key(pk)
+    exchange     = Exchange(account, base_url=BASE_URL)
+    info         = Info(base_url=BASE_URL, skip_ws=True)
     main_address = os.environ.get("HL_WALLET_ADDRESS", account.address)
     return exchange, info, main_address
 
+
+def _hip3_coin(coin: str) -> str:
+    """Retourne le nom namespaced HIP-3 du coin, ex. 'xyz:GOLD'."""
+    return f"{HIP3_DEX}:{coin}"
+
+
+# ════════════════════════════════════════════════════════════
+# BALANCE / POSITIONS
+# ════════════════════════════════════════════════════════════
 
 def get_balance() -> float:
     _, info, address = _clients()
@@ -49,9 +47,27 @@ def get_balance() -> float:
 
 def get_positions() -> list:
     _, info, address = _clients()
-    state = info.user_state(address)
-    return [p for p in state["assetPositions"] if float(p["position"]["szi"]) != 0]
 
+    # Perps classiques
+    state     = info.user_state(address)
+    positions = [p for p in state.get("assetPositions", [])
+                 if float(p["position"]["szi"]) != 0]
+
+    # Positions HIP-3 (TradFi)
+    try:
+        hip3_state = info.user_state(address, dex=HIP3_DEX)
+        for p in hip3_state.get("assetPositions", []):
+            if float(p["position"]["szi"]) != 0:
+                positions.append(p)
+    except Exception as e:
+        logger.warning(f"Impossible de récupérer positions HIP-3: {e}")
+
+    return positions
+
+
+# ════════════════════════════════════════════════════════════
+# HELPERS
+# ════════════════════════════════════════════════════════════
 
 def _extract_oid(order_result: dict):
     try:
@@ -75,56 +91,28 @@ def _extract_fill_price(order_result: dict, fallback: float) -> float:
     return fallback
 
 
-# ════════════════════════════════════════════════════════════
-# SPOT MARKET HELPERS (TradFi)
-# ════════════════════════════════════════════════════════════
-
-def _find_spot_market_id(coin: str) -> str:
-    """Retourne l'identifiant @N du marché spot HL pour un coin TradFi."""
-    if coin in _spot_market_cache:
-        return _spot_market_cache[coin]
-
-    resp = requests.post(
-        f"{BASE_URL}/info",
-        json={"type": "spotMetaAndAssetCtxs"},
-        headers={"Content-Type": "application/json"},
-        timeout=10,
-    )
-    data     = resp.json()
-    tokens   = data[0].get("tokens", [])
-    universe = data[0].get("universe", [])
-
-    idx_to_name  = {t["index"]: t["name"] for t in tokens}
-    target_names = set(TRADFI_TOKEN_ALIASES.get(coin, [coin]))
-
-    for market in universe:
-        mkt_name = market.get("name", "")
-        if not mkt_name.startswith("@"):
-            continue
-        for tok_idx in market.get("tokens", []):
-            if idx_to_name.get(tok_idx, "") in target_names:
-                _spot_market_cache[coin] = mkt_name
-                logger.info(f"TradFi spot: {coin} → {mkt_name} (token: {idx_to_name.get(tok_idx)})")
-                return mkt_name
-
-    raise KeyError(f"Spot market introuvable pour {coin} (cherchait: {target_names})")
+def _hip3_mid_price(coin: str, info) -> float:
+    """Prix mid d'un coin TradFi via DEX xyz, ex. 'xyz:GOLD' → 5096.05."""
+    mids = info.all_mids(dex=HIP3_DEX)
+    key  = _hip3_coin(coin)
+    if key in mids:
+        return float(mids[key])
+    raise KeyError(f"Prix introuvable pour {coin} sur DEX {HIP3_DEX} (clé attendue: {key})")
 
 
-def _spot_mid_price(market_id: str, info) -> float:
+def get_mid_price(coin: str) -> float:
+    _, info, _ = _clients()
+
+    # TradFi HIP-3 — prix disponible via DEX xyz
+    if coin in TRADFI_COINS:
+        return _hip3_mid_price(coin, info)
+
+    # Crypto perps classiques
     mids = info.all_mids()
-    if market_id in mids:
-        return float(mids[market_id])
-    raise KeyError(f"Prix introuvable pour {market_id}")
+    if coin in mids:
+        return float(mids[coin])
 
-
-def _market_close_spot(exchange, info, market_id: str, is_long: bool, size: float) -> dict:
-    mid      = _spot_mid_price(market_id, info)
-    limit_px = round(mid * 0.98 if is_long else mid * 1.02, 4)
-    return exchange.order(
-        market_id, not is_long, size, limit_px,
-        order_type={"limit": {"tif": "Ioc"}},
-        reduce_only=True,
-    )
+    raise KeyError(f"Coin '{coin}' introuvable sur Hyperliquid")
 
 
 # ════════════════════════════════════════════════════════════
@@ -134,7 +122,7 @@ def _market_close_spot(exchange, info, market_id: str, is_long: bool, size: floa
 def open_trade(coin: str, is_long: bool, size: float, leverage: int,
                sl_price: float, tp_price: float, entry_price: float = 0.0) -> dict:
     if coin in TRADFI_COINS:
-        return _open_trade_spot(coin, is_long, size, leverage, entry_price, sl_price, tp_price)
+        return _open_trade_hip3(coin, is_long, size, leverage, entry_price, sl_price, tp_price)
     return _open_trade_perp(coin, is_long, size, leverage, sl_price, tp_price)
 
 
@@ -173,59 +161,59 @@ def _open_trade_perp(coin: str, is_long: bool, size: float, leverage: int,
         "sl_oid": sl_oid, "tp_oid": tp_oid,
         "entry": fill_price, "is_long": is_long,
         "size": size, "tp": tp_price, "sl": sl_price,
-        "is_spot": False,
+        "coin_key": coin,
+        "is_hip3": False,
     }
     return {"success": True, "fill_price": fill_price, "sl_oid": sl_oid, "tp_oid": tp_oid}
 
 
-def _open_trade_spot(coin: str, is_long: bool, size: float, leverage: int,
+def _open_trade_hip3(coin: str, is_long: bool, size: float, leverage: int,
                      entry_price: float, sl_price: float, tp_price: float) -> dict:
+    """
+    Ouvre un trade sur un marché TradFi HIP-3 (DEX 'xyz').
+    Fonctionne exactement comme un perp classique — même SDK, même appels —
+    mais le coin est passé sous forme namespaced : 'xyz:GOLD', 'xyz:CL', etc.
+    """
     exchange, info, _ = _clients()
+    hip3_coin = _hip3_coin(coin)    # ex. "xyz:GOLD"
 
-    market_id = _find_spot_market_id(coin)
-
-    lev_result = exchange.update_leverage(leverage, market_id, is_cross=False)
-    logger.info(f"Levier spot {coin} ({market_id}): {lev_result}")
-
+    # Récupère le prix mid si non fourni
     if not entry_price or entry_price <= 0:
-        raise ValueError(f"Prix introuvable pour {coin} — spécifie le paramètre entry manuellement")
-    mid      = entry_price
-    limit_px = round(mid * 1.002 if is_long else mid * 0.998, 2)
+        entry_price = _hip3_mid_price(coin, info)
 
-    market_result = exchange.order(
-        market_id, is_long, size, limit_px,
-        order_type={"limit": {"tif": "Ioc"}},
-        reduce_only=False,
-    )
-    logger.info(f"Market open spot {coin} ({market_id}): {market_result}")
+    lev_result = exchange.update_leverage(leverage, hip3_coin, is_cross=False)
+    logger.info(f"Levier HIP-3 {coin} ({hip3_coin}): {lev_result}")
+
+    market_result = exchange.market_open(hip3_coin, is_long, size, slippage=0.01)
+    logger.info(f"Market open HIP-3 {coin} ({hip3_coin}): {market_result}")
 
     if not market_result or market_result.get("status") != "ok":
         return {"success": False, "error": str(market_result)}
 
-    fill_price = _extract_fill_price(market_result, entry_price or mid)
+    fill_price = _extract_fill_price(market_result, entry_price)
 
     sl_result = exchange.order(
-        market_id, not is_long, size, sl_price,
+        hip3_coin, not is_long, size, sl_price,
         order_type={"trigger": {"triggerPx": sl_price, "isMarket": True, "tpsl": "sl"}},
         reduce_only=True,
     )
     sl_oid = _extract_oid(sl_result)
-    logger.info(f"SL spot {coin} oid={sl_oid}: {sl_result}")
+    logger.info(f"SL HIP-3 {coin} oid={sl_oid}: {sl_result}")
 
     tp_result = exchange.order(
-        market_id, not is_long, size, tp_price,
+        hip3_coin, not is_long, size, tp_price,
         order_type={"trigger": {"triggerPx": tp_price, "isMarket": True, "tpsl": "tp"}},
         reduce_only=True,
     )
     tp_oid = _extract_oid(tp_result)
-    logger.info(f"TP spot {coin} oid={tp_oid}: {tp_result}")
+    logger.info(f"TP HIP-3 {coin} oid={tp_oid}: {tp_result}")
 
     open_orders[coin] = {
         "sl_oid": sl_oid, "tp_oid": tp_oid,
         "entry": fill_price, "is_long": is_long,
         "size": size, "tp": tp_price, "sl": sl_price,
-        "market_id": market_id,
-        "is_spot": True,
+        "coin_key": hip3_coin,   # "xyz:GOLD" — utilisé pour cancel/close
+        "is_hip3": True,
     }
     return {"success": True, "fill_price": fill_price, "sl_oid": sl_oid, "tp_oid": tp_oid}
 
@@ -245,7 +233,7 @@ def move_sl_to_be(coin: str) -> dict:
     is_long  = trade["is_long"]
     size     = trade["size"]
     sl_oid   = trade["sl_oid"]
-    coin_key = trade.get("market_id", coin)
+    coin_key = trade.get("coin_key", coin)   # "xyz:GOLD" ou "BTC"
 
     if sl_oid:
         cancel_result = exchange.cancel(coin_key, sl_oid)
@@ -270,11 +258,11 @@ def move_sl_to_be(coin: str) -> dict:
 # ════════════════════════════════════════════════════════════
 
 def close_position(coin: str) -> dict:
-    exchange, info, _ = _clients()
+    exchange, _, _ = _clients()
     trade    = open_orders.get(coin)
-    is_spot  = trade.get("is_spot", False) if trade else False
-    coin_key = trade.get("market_id", coin) if trade else coin
+    coin_key = trade.get("coin_key", coin) if trade else coin
 
+    # Annule SL et TP existants
     if trade:
         for oid_key in ("sl_oid", "tp_oid"):
             oid = trade.get(oid_key)
@@ -284,21 +272,20 @@ def close_position(coin: str) -> dict:
                 except Exception as e:
                     logger.warning(f"Impossible d'annuler {oid_key} {oid}: {e}")
 
-    if is_spot and trade:
-        result = _market_close_spot(exchange, info, coin_key, trade["is_long"], trade["size"])
-    else:
-        result = exchange.market_close(coin)
-
-    logger.info(f"Close {coin}: {result}")
+    # Ferme la position au marché (fonctionne pour perp ET HIP-3)
+    result = exchange.market_close(coin_key)
+    logger.info(f"Close {coin} ({coin_key}): {result}")
 
     if result and result.get("status") == "ok":
         open_orders.pop(coin, None)
         return {"success": True}
 
+    # Vérification secondaire via positions ouvertes
     try:
         positions = get_positions()
         still_open = any(
-            p["position"]["coin"] == coin and float(p["position"]["szi"]) != 0
+            p["position"]["coin"] in (coin, coin_key)
+            and float(p["position"]["szi"]) != 0
             for p in positions
         )
         if not still_open:
@@ -308,21 +295,3 @@ def close_position(coin: str) -> dict:
         logger.warning(f"Impossible de vérifier position après close: {e}")
 
     return {"success": False, "error": str(result)}
-
-
-# ════════════════════════════════════════════════════════════
-# GET MID PRICE (pour /trade manuel)
-# ════════════════════════════════════════════════════════════
-
-def get_mid_price(coin: str) -> float:
-    _, info, _ = _clients()
-    mids = info.all_mids()
-
-    # Crypto perps
-    if coin in mids:
-        return float(mids[coin])
-
-    # TradFi — prix doit être fourni manuellement
-    if coin in TRADFI_COINS:
-        raise KeyError(f"Coin '{coin}' est TradFi — spécifie le prix entry manuellement")
-    raise KeyError(f"Coin '{coin}' introuvable sur Hyperliquid")

@@ -191,14 +191,20 @@ def close_position(coin: str) -> dict:
 
     return {"success": False, "error": str(result)}
 
-
 def get_mid_price(coin: str) -> float:
     _, info, _ = _clients()
-    mids = info.all_mids()
-    return float(mids[coin])
 
-def get_mid_price(coin: str) -> float:
-    _, info, _ = _clients()
+    # Essai 1 : all_mids (crypto perps)
     mids = info.all_mids()
-    logger.info(f"Toutes les clés mids: {list(mids.keys())}")
-    return float(mids[coin])
+    if coin in mids:
+        return float(mids[coin])
+
+    # Essai 2 : meta_and_asset_ctxs (TradFi)
+    meta, asset_ctxs = info.meta_and_asset_ctxs()
+    for i, asset in enumerate(meta["universe"]):
+        if asset["name"] == coin:
+            ctx = asset_ctxs[i]
+            if ctx and ctx.get("markPx"):
+                return float(ctx["markPx"])
+
+    raise KeyError(f"Coin '{coin}' introuvable sur Hyperliquid")

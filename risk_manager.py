@@ -51,11 +51,26 @@ def remove_asset(coin: str) -> bool:
     save(cfg)
     return True
 
+DEFAULT_PRICE_DECIMALS = 4
+
+KNOWN_PRICE_DECIMALS = {
+    "BTC": 1, "ETH": 2, "SOL": 2, "HYPE": 4, "BNB": 2, "XRP": 4,
+    "XYZ100": 1, "GOLD": 2, "SILVER": 3, "CL": 2, "EUR": 4, "USA500": 1,
+}
+
 def get_precision(coin: str) -> int:
     return load().get("coin_precision", {}).get(coin, KNOWN_PRECISION.get(coin, DEFAULT_PRECISION))
 
 def get_min_size(coin: str) -> float:
     return load().get("coin_min_size", {}).get(coin, KNOWN_MIN_SIZE.get(coin, DEFAULT_MIN_SIZE))
+
+def get_price_decimals(coin: str) -> int:
+    return load().get("coin_price_decimals", {}).get(
+        coin, KNOWN_PRICE_DECIMALS.get(coin, DEFAULT_PRICE_DECIMALS)
+    )
+
+def round_price(coin: str, price: float) -> float:
+    return round(price, get_price_decimals(coin))
 
 def should_trade(setup: str, ticker: str, dr_detail: str) -> tuple[bool, str]:
     cfg = load()

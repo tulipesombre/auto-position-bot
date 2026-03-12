@@ -141,7 +141,7 @@ def _recalc_tp(fill_price: float, sl_price: float, tp_price: float,
     r_ratio  = abs(tp_price - entry_price) / abs(entry_price - sl_price)
     sl_dist  = abs(fill_price - sl_price)
     new_tp   = fill_price + sl_dist * r_ratio if is_long else fill_price - sl_dist * r_ratio
-    new_tp   = round(new_tp, 2)
+    new_tp   = round(new_tp, 8)  # précision intermédiaire — round_price appliqué à l'ordre
     logger.info(f"TP recalculé depuis fill {fill_price:.4f}: {tp_price:.4f} → {new_tp:.4f} (R={r_ratio:.2f})")
     return new_tp
 
@@ -198,8 +198,12 @@ def _open_trade_perp(coin: str, is_long: bool, size: float, leverage: int,
     if order_err:
         return {"success": False, "error": order_err}
 
+    from risk_manager import round_price
     fill_price = _extract_fill_price(market_result, entry_price or sl_price)
     tp_price   = _recalc_tp(fill_price, sl_price, tp_price, entry_price or fill_price, is_long)
+    sl_price   = round_price(coin, sl_price)
+    tp_price   = round_price(coin, tp_price)
+    logger.info(f"Prix arrondis {coin}: sl={sl_price} tp={tp_price}")
 
     sl_result = exchange.order(
         coin, not is_long, size, sl_price,
@@ -256,8 +260,12 @@ def _open_trade_hip3(coin: str, is_long: bool, size: float, leverage: int,
     if order_err:
         return {"success": False, "error": order_err}
 
+    from risk_manager import round_price
     fill_price = _extract_fill_price(market_result, entry_price)
     tp_price   = _recalc_tp(fill_price, sl_price, tp_price, entry_price, is_long)
+    sl_price   = round_price(coin, sl_price)
+    tp_price   = round_price(coin, tp_price)
+    logger.info(f"Prix arrondis HIP-3 {coin}: sl={sl_price} tp={tp_price}")
 
     sl_result = exchange.order(
         hip3_coin, not is_long, size, sl_price,

@@ -17,7 +17,6 @@ def _clients():
     account = eth_account.Account.from_key(pk)
     exchange = Exchange(account, base_url=BASE_URL)
     info = Info(base_url=BASE_URL, skip_ws=True)
-    # Adresse principale pour les requêtes info, API wallet pour les trades
     main_address = os.environ.get("HL_WALLET_ADDRESS", account.address)
     return exchange, info, main_address
 
@@ -46,7 +45,6 @@ def _extract_oid(order_result: dict) -> int | None:
         pass
     return None
 
-
 def _extract_fill_price(order_result: dict, fallback: float) -> float:
     try:
         status = order_result["response"]["data"]["statuses"][0]
@@ -69,7 +67,7 @@ def open_trade(coin: str, is_long: bool, size: float, leverage: int,
     market_result = exchange.market_open(coin, is_long, size, slippage=0.01)
     logger.info(f"Market open {coin}: {market_result}")
 
-    if market_result.get("status") != "ok":
+    if not market_result or market_result.get("status") != "ok":
         return {"success": False, "error": market_result}
 
     fill_price = _extract_fill_price(market_result, sl_price)
@@ -86,13 +84,14 @@ def open_trade(coin: str, is_long: bool, size: float, leverage: int,
     sl_oid = _extract_oid(sl_result)
     logger.info(f"SL order {coin} oid={sl_oid}: {sl_result}")
 
-    # 4. Take-Profit (trigger limit, reduce only)
+    # 4. Take-Profit (trigger market, reduce only)
+    # isMarket: True évite le rejet "Invalid TP/SL price" sur les trigger limit
     tp_result = exchange.order(
         coin,
         not is_long,
         size,
         tp_price,
-        order_type={"trigger": {"triggerPx": tp_price, "isMarket": False, "tpsl": "tp"}},
+        order_type={"trigger": {"triggerPx": tp_price, "isMarket": True, "tpsl": "tp"}},
         reduce_only=True,
     )
     tp_oid = _extract_oid(tp_result)
@@ -100,20 +99,20 @@ def open_trade(coin: str, is_long: bool, size: float, leverage: int,
 
     # Stockage local pour les actions Discord
     open_orders[coin] = {
-        "sl_oid":   sl_oid,
-        "tp_oid":   tp_oid,
-        "entry":    fill_price,
-        "is_long":  is_long,
-        "size":     size,
-        "tp":       tp_price,
-        "sl":       sl_price,
+        "sl_oid":  sl_oid,
+        "tp_oid":  tp_oid,
+        "entry":   fill_price,
+        "is_long": is_long,
+        "size":    size,
+        "tp":      tp_price,
+        "sl":      sl_price,
     }
 
     return {
-        "success":     True,
-        "fill_price":  fill_price,
-        "sl_oid":      sl_oid,
-        "tp_oid":      tp_oid,
+        "success":    True,
+        "fill_price": fill_price,
+        "sl_oid":     sl_oid,
+        "tp_oid":     tp_oid,
     }
 
 
@@ -125,10 +124,10 @@ def move_sl_to_be(coin: str) -> dict:
     if not trade:
         return {"success": False, "error": f"Aucune donnée locale pour {coin}"}
 
-    entry    = trade["entry"]
-    is_long  = trade["is_long"]
-    size     = trade["size"]
-    sl_oid   = trade["sl_oid"]
+    entry   = trade["entry"]
+    is_long = trade["is_long"]
+    size    = trade["size"]
+    sl_oid  = trade["sl_oid"]
 
     # Annuler le SL existant
     if sl_oid:
@@ -155,7 +154,7 @@ def move_sl_to_be(coin: str) -> dict:
 
 def close_position(coin: str) -> dict:
     """Ferme la position en market et annule SL/TP."""
-    exchange, _, address = _clients()
+    exchange, _, _ = _clients()
     trade = open_orders.get(coin)
 
     # Annuler SL et TP si on a les OIDs
@@ -172,10 +171,26 @@ def close_position(coin: str) -> dict:
     result = exchange.market_close(coin)
     logger.info(f"Market close {coin}: {result}")
 
-    if result.get("status") == "ok":
+    # Gérer le cas où market_close retourne None
+    if result and result.get("status") == "ok":
         open_orders.pop(coin, None)
         return {"success": True}
-    return {"success": False, "error": result}
+
+    # Fallback : vérifier si la position est bien fermée malgré le None
+    try:
+        positions = get_positions()
+        still_open = any(
+            p["position"]["coin"] == coin and float(p["position"]["szi"]) != 0
+            for p in positions
+        )
+        if not still_open:
+            open_orders.pop(coin, None)
+            return {"success": True}
+    except Exception as e:
+        logger.warning(f"Impossible de vérifier la position après close: {e}")
+
+    return {"success": False, "error": str(result)}
+
 
 def get_mid_price(coin: str) -> float:
     _, info, _ = _clients()

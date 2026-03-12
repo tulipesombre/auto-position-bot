@@ -199,26 +199,26 @@ def get_mid_price(coin: str) -> float:
     if coin in mids:
         return float(mids[coin])
 
-    # Essai 2 : REST direct pour TradFi
+    # Essai 2 : spot market (TradFi sur HL)
     import requests
     resp = requests.post(
         f"{BASE_URL}/info",
-        json={"type": "allMids"},
+        json={"type": "spotMetaAndAssetCtxs"},
         headers={"Content-Type": "application/json"}
     )
-    all_data = resp.json()
+    data = resp.json()
+    # data[0] = meta, data[1] = ctxs
+    spot_meta = data[0]
+    spot_ctxs = data[1]
     
-    # Cherche dans la réponse complète
-    if isinstance(all_data, dict) and coin in all_data:
-        return float(all_data[coin])
+    for i, token in enumerate(spot_meta.get("tokens", [])):
+        if token.get("name") == coin:
+            logger.info(f"Token trouvé: {token}")
+            break
 
-    # Essai 3 : mark price via clearinghouseState
-    resp2 = requests.post(
-        f"{BASE_URL}/info",
-        json={"type": "metaAndAssetCtxs"},
-        headers={"Content-Type": "application/json"}
-    )
-    data = resp2.json()
-    logger.info(f"TradFi search for {coin}: keys={list(data[0].get('universe', [{}])[:3])}")
-    
-    raise KeyError(f"Coin '{coin}' introuvable sur Hyperliquid")
+    for i, market in enumerate(spot_meta.get("universe", [])):
+        name = market.get("name", "")
+        if coin in name:
+            logger.info(f"Market trouvé: {market}, ctx: {spot_ctxs[i] if i < len(spot_ctxs) else 'N/A'}")
+
+    raise KeyError(f"Coin '{coin}' introuvable — voir logs")

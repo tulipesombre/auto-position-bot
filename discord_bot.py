@@ -23,24 +23,21 @@ ASSET_CHANNELS = {
     "XRP":  int(os.environ.get("DISCORD_CHANNEL_XRP",  0)),
     "XYZ100": int(os.environ.get("DISCORD_CHANNEL_XYZ100", 0)),
     "USA500": int(os.environ.get("DISCORD_CHANNEL_USA500", 0)),
-    "GOLD":     int(os.environ.get("DISCORD_CHANNEL_GC",     0)),
-    "SILVER":     int(os.environ.get("DISCORD_CHANNEL_SI",     0)),
+    "GOLD":   int(os.environ.get("DISCORD_CHANNEL_GC",     0)),
+    "SILVER": int(os.environ.get("DISCORD_CHANNEL_SI",     0)),
     "CL":     int(os.environ.get("DISCORD_CHANNEL_CL",     0)),
-    "EUR": int(os.environ.get("DISCORD_CHANNEL_EUR", 0)),
+    "EUR":    int(os.environ.get("DISCORD_CHANNEL_EUR", 0)),
 }
 
 def get_channel_for_ticker(ticker: str):
     """Retourne le channel Discord pour un ticker donné, ou le channel par défaut."""
     from config_manager import load
     cfg = load()
-    # Channels stockés dans config.json (ajoutés via /add_asset)
     asset_channels_cfg = cfg.get("asset_channels", {})
     ticker_upper = ticker.upper()
-    # Cherche dans les channels de la config
     for coin, ch_id in asset_channels_cfg.items():
         if coin in ticker_upper and ch_id:
             return bot.get_channel(int(ch_id))
-    # Cherche dans les variables d environnement
     for coin, ch_id in ASSET_CHANNELS.items():
         if coin in ticker_upper and ch_id:
             return bot.get_channel(ch_id)
@@ -80,17 +77,13 @@ class TradeView(discord.ui.View):
             result = hl.move_sl_to_be(self.coin)
             if result["success"]:
                 be = result["be_price"]
-                await interaction.followup.send(
-                    f"✅ SL déplacé au BE — **{self.coin}** @ `{be:,.4f}`", 
-                )
+                await interaction.followup.send(f"✅ SL déplacé au BE — **{self.coin}** @ `{be:,.4f}`")
                 button.disabled = True
                 await interaction.message.edit(view=self)
             else:
-                await interaction.followup.send(
-                    f"❌ Erreur : {result.get('error')}", 
-                )
+                await interaction.followup.send(f"❌ Erreur : {result.get('error')}")
         except Exception as e:
-            await interaction.followup.send(f"❌ Exception : {e}",)
+            await interaction.followup.send(f"❌ Exception : {e}")
 
     @discord.ui.button(label="❌ Fermer position", style=discord.ButtonStyle.danger)
     async def close_pos(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -99,18 +92,14 @@ class TradeView(discord.ui.View):
             import hyperliquid_client as hl
             result = hl.close_position(self.coin)
             if result["success"]:
-                await interaction.followup.send(
-                    f"✅ Position **{self.coin}** fermée au marché", 
-                )
+                await interaction.followup.send(f"✅ Position **{self.coin}** fermée au marché")
                 for child in self.children:
                     child.disabled = True
                 await interaction.message.edit(view=self)
             else:
-                await interaction.followup.send(
-                    f"❌ Erreur : {result.get('error')}", 
-                )
+                await interaction.followup.send(f"❌ Erreur : {result.get('error')}")
         except Exception as e:
-            await interaction.followup.send(f"❌ Exception : {e}", )
+            await interaction.followup.send(f"❌ Exception : {e}")
 
 # ════════════════════════════════════════════════════════════
 # FONCTIONS D'ENVOI (appelées depuis webhook.py via threadsafe)
@@ -201,10 +190,10 @@ async def config_show(interaction: discord.Interaction):
     embed.add_field(name="📋 Setups",      value=cfg["setups"],                                inline=True)
     embed.add_field(name="🔺 DR Filter",   value=cfg["dr_filter"],                             inline=True)
     embed.add_field(name="⚡ Levier max",  value=f"{cfg.get('max_leverage', 40)}x",            inline=True)
-    embed.add_field(name="🎯 Entry mode",  value=cfg.get("entry_mode", "touch"),              inline=True)
+    embed.add_field(name="🎯 Entry mode",  value=cfg.get("entry_mode", "touch"),               inline=True)
     embed.add_field(name="🔛 Bot",         value="✅ Actif" if cfg["bot_active"] else "⏸️ Pause", inline=True)
     embed.add_field(name="📡 Assets",      value=assets,                                       inline=False)
-    await interaction.response.send_message(embed=embed, )
+    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="set", description="Modifier un paramètre de configuration")
 @app_commands.describe(param="Paramètre", value="Nouvelle valeur")
@@ -216,15 +205,15 @@ async def config_show(interaction: discord.Interaction):
     app_commands.Choice(name="setups (S1 / S2 / both)",       value="setups"),
     app_commands.Choice(name="dr_filter (off/soft/strict)",   value="dr_filter"),
     app_commands.Choice(name="max_leverage",                  value="max_leverage"),
-    app_commands.Choice(name="entry_mode (touch / close)",   value="entry_mode"),
+    app_commands.Choice(name="entry_mode (touch / close)",    value="entry_mode"),
 ])
 async def set_param(interaction: discord.Interaction, param: str, value: str):
     from config_manager import set_val
     NUMERIC = {"capital", "risk_pct", "r_target", "max_leverage"}
     VALID   = {
-        "sl_type":   ["structural", "chod"],
-        "setups":    ["S1", "S2", "both"],
-        "dr_filter": ["off", "soft", "strict"],
+        "sl_type":    ["structural", "chod"],
+        "setups":     ["S1", "S2", "both"],
+        "dr_filter":  ["off", "soft", "strict"],
         "entry_mode": ["touch", "close"],
     }
     try:
@@ -237,18 +226,24 @@ async def set_param(interaction: discord.Interaction, param: str, value: str):
                 )
                 return
             set_val(param, value)
-        await interaction.response.send_message(
-            f"✅ `{param}` mis à jour → `{value}`", 
-        )
+        await interaction.response.send_message(f"✅ `{param}` mis à jour → `{value}`")
     except Exception as e:
-        await interaction.response.send_message(f"❌ Erreur : {e}", )
+        await interaction.response.send_message(f"❌ Erreur : {e}")
 
 @bot.tree.command(name="toggle_asset", description="Activer / désactiver un asset")
 @app_commands.choices(asset=[
-    app_commands.Choice(name="BTC",  value="BTC"),
-    app_commands.Choice(name="ETH",  value="ETH"),
-    app_commands.Choice(name="SOL",  value="SOL"),
-    app_commands.Choice(name="HYPE", value="HYPE"),
+    app_commands.Choice(name="BTC",     value="BTC"),
+    app_commands.Choice(name="ETH",     value="ETH"),
+    app_commands.Choice(name="SOL",     value="SOL"),
+    app_commands.Choice(name="HYPE",    value="HYPE"),
+    app_commands.Choice(name="BNB",     value="BNB"),
+    app_commands.Choice(name="XRP",     value="XRP"),
+    app_commands.Choice(name="XYZ100",  value="XYZ100"),
+    app_commands.Choice(name="USA500",  value="USA500"),
+    app_commands.Choice(name="GOLD",    value="GOLD"),
+    app_commands.Choice(name="SILVER",  value="SILVER"),
+    app_commands.Choice(name="CL",      value="CL"),
+    app_commands.Choice(name="EUR",     value="EUR"),
 ])
 async def toggle_asset(interaction: discord.Interaction, asset: str):
     from config_manager import load, save
@@ -256,14 +251,13 @@ async def toggle_asset(interaction: discord.Interaction, asset: str):
     cfg["assets"][asset] = not cfg["assets"].get(asset, True)
     save(cfg)
     state = "✅ activé" if cfg["assets"][asset] else "❌ désactivé"
-    await interaction.response.send_message(f"**{asset}** {state}", )
+    await interaction.response.send_message(f"**{asset}** {state}")
 
 @bot.tree.command(name="pause", description="Mettre le bot en pause (aucun trade)")
 async def pause_bot(interaction: discord.Interaction):
     from config_manager import set_val
     set_val("bot_active", False)
     await interaction.response.send_message("⏸️ Bot en **pause** — aucun trade ne sera pris")
-
 
 @bot.tree.command(name="resume", description="Reprendre le bot")
 async def resume_bot(interaction: discord.Interaction):
@@ -276,12 +270,12 @@ async def show_positions(interaction: discord.Interaction):
     await interaction.response.defer()
     try:
         import hyperliquid_client as hl
-        loop = asyncio.get_running_loop()
+        loop      = asyncio.get_running_loop()
         positions = await asyncio.wait_for(loop.run_in_executor(None, hl.get_positions), timeout=8.0)
         balance   = await asyncio.wait_for(loop.run_in_executor(None, hl.get_balance),   timeout=8.0)
 
         if not positions:
-            await interaction.followup.send("📭 Aucune position ouverte", )
+            await interaction.followup.send("📭 Aucune position ouverte")
             return
 
         embed = discord.Embed(title="📊  Positions ouvertes", color=0x7289da)
@@ -301,26 +295,23 @@ async def show_positions(interaction: discord.Interaction):
                 value=f"Entry : `{entry:,.4f}`\nSize  : `{abs(szi)}`\nPnL   : {pnl_ico} `${upnl:,.2f}`\nLevier: `{lev}x`",
                 inline=True,
             )
-        await interaction.followup.send(embed=embed,)
+        await interaction.followup.send(embed=embed)
     except Exception as e:
-        await interaction.followup.send(f"❌ Erreur : {e}",)
+        await interaction.followup.send(f"❌ Erreur : {e}")
 
 @bot.tree.command(name="balance", description="Afficher le solde du compte Hyperliquid")
 async def show_balance(interaction: discord.Interaction):
     await interaction.response.defer()
     try:
         import hyperliquid_client as hl
-        loop = asyncio.get_running_loop()
-        balance = await asyncio.wait_for(
-            loop.run_in_executor(None, hl.get_balance),
-            timeout=10.0
-        )
-        await interaction.followup.send(f"💰 Balance : **${balance:,.2f} USDC**",)
+        loop    = asyncio.get_running_loop()
+        balance = await asyncio.wait_for(loop.run_in_executor(None, hl.get_balance), timeout=10.0)
+        await interaction.followup.send(f"💰 Balance : **${balance:,.2f} USDC**")
     except asyncio.TimeoutError:
-        await interaction.followup.send("❌ Timeout — Hyperliquid ne répond pas",)
+        await interaction.followup.send("❌ Timeout — Hyperliquid ne répond pas")
     except Exception as e:
-        await interaction.followup.send(f"❌ Erreur : {e}",)
-        
+        await interaction.followup.send(f"❌ Erreur : {e}")
+
 @bot.tree.command(name="add_asset", description="Ajouter un asset à trader")
 @app_commands.describe(
     ticker="Ticker TradingView (ex: SOLUSDT.P)",
@@ -328,35 +319,32 @@ async def show_balance(interaction: discord.Interaction):
 )
 async def add_asset_cmd(interaction: discord.Interaction, ticker: str, channel: discord.TextChannel = None):
     from risk_manager import add_asset
-    ch_id = channel.id if channel else 0
+    ch_id  = channel.id if channel else 0
     result = add_asset(ticker.upper(), ch_id)
-    coin = result["coin"]
+    coin   = result["coin"]
     ch_txt = channel.mention if channel else "channel par défaut"
-    embed = discord.Embed(title="✅ Asset ajouté", color=0x00e676)
-    embed.add_field(name="Ticker",   value=ticker.upper(), inline=True)
-    embed.add_field(name="Coin",     value=coin,           inline=True)
-    embed.add_field(name="Channel",  value=ch_txt,         inline=True)
+    embed  = discord.Embed(title="✅ Asset ajouté", color=0x00e676)
+    embed.add_field(name="Ticker",  value=ticker.upper(), inline=True)
+    embed.add_field(name="Coin",    value=coin,           inline=True)
+    embed.add_field(name="Channel", value=ch_txt,         inline=True)
     embed.set_footer(text="Utilise /toggle_asset pour activer/désactiver")
-    await interaction.response.send_message(embed=embed,)
-
+    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="remove_asset", description="Supprimer un asset de la liste")
 @app_commands.describe(coin="Nom du coin (ex: SOL)")
 async def remove_asset_cmd(interaction: discord.Interaction, coin: str):
     from risk_manager import remove_asset
     remove_asset(coin.upper())
-    await interaction.response.send_message(
-        f"🗑️ **{coin.upper()}** supprimé de la liste des assets",
-    )
+    await interaction.response.send_message(f"🗑️ **{coin.upper()}** supprimé de la liste des assets")
 
 @bot.tree.command(name="assets", description="Voir tous les assets configurés")
 async def list_assets(interaction: discord.Interaction):
     from config_manager import load
-    cfg = load()
+    cfg      = load()
     assets   = cfg.get("assets", {})
     channels = cfg.get("asset_channels", {})
     if not assets:
-        await interaction.response.send_message("📭 Aucun asset configuré",)
+        await interaction.response.send_message("📭 Aucun asset configuré")
         return
     embed = discord.Embed(title="📡  Assets configurés", color=0x7289da)
     for coin, active in assets.items():
@@ -367,19 +355,20 @@ async def list_assets(interaction: discord.Interaction):
             value=ch_txt,
             inline=True
         )
-    await interaction.response.send_message(embed=embed,)
+    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="trade", description="Ouvrir un trade manuellement")
 @app_commands.describe(
-    coin="Asset (ex: BTC, SI, EUR)",
+    coin="Asset (ex: BTC, SILVER, EUR)",
     direction="LONG ou SHORT",
-    sl="Niveau de Stop-Loss"
+    sl="Niveau de Stop-Loss",
+    entry="Prix d'entrée (optionnel pour crypto, obligatoire pour TradFi)"
 )
 @app_commands.choices(direction=[
     app_commands.Choice(name="LONG",  value="LONG"),
     app_commands.Choice(name="SHORT", value="SHORT"),
 ])
-async def manual_trade(interaction: discord.Interaction, coin: str, direction: str, sl: float):
+async def manual_trade(interaction: discord.Interaction, coin: str, direction: str, sl: float, entry: float = 0.0):
     await interaction.response.defer()
     try:
         import hyperliquid_client as hl
@@ -390,10 +379,20 @@ async def manual_trade(interaction: discord.Interaction, coin: str, direction: s
         is_long = direction == "LONG"
         coin    = coin.upper()
 
-        # Prix market actuel via HL
-        loop        = asyncio.get_running_loop()
-        balance     = await asyncio.wait_for(loop.run_in_executor(None, hl.get_balance), timeout=8.0)
-        mid_price   = await asyncio.wait_for(loop.run_in_executor(None, hl.get_mid_price, coin), timeout=8.0)
+        loop    = asyncio.get_running_loop()
+        balance = await asyncio.wait_for(loop.run_in_executor(None, hl.get_balance), timeout=8.0)
+
+        if entry == 0.0:
+            try:
+                mid_price = await asyncio.wait_for(loop.run_in_executor(None, hl.get_mid_price, coin), timeout=8.0)
+            except Exception:
+                await interaction.followup.send(
+                    f"❌ Prix introuvable pour **{coin}** — spécifie le paramètre `entry` manuellement\n"
+                    f"Exemple : `/trade {coin} {direction} {sl} 85000`"
+                )
+                return
+        else:
+            mid_price = entry
 
         calc = calc_position(mid_price, sl, balance)
         size = round_size(coin, calc["size_raw"])
@@ -410,19 +409,19 @@ async def manual_trade(interaction: discord.Interaction, coin: str, direction: s
                 title=f"{'📈' if is_long else '📉'}  Trade manuel — {coin}",
                 color=0x00e676 if is_long else 0xff1744
             )
-            embed.add_field(name="Direction",   value=direction,                          inline=True)
-            embed.add_field(name="Entry",        value=f"`{result['fill_price']:,.4f}`",   inline=True)
-            embed.add_field(name="Stop-Loss",    value=f"`{sl:,.4f}`",                     inline=True)
-            embed.add_field(name="Take-Profit",  value=f"`{calc['tp']:,.4f}`",             inline=True)
-            embed.add_field(name="Size",         value=f"{size} {coin}",                  inline=True)
-            embed.add_field(name="Risque",       value=f"${calc['risk_usd']:,.2f}",        inline=True)
-            embed.add_field(name="Levier",       value=f"{calc['leverage']}x",             inline=True)
-            await interaction.followup.send(embed=embed, view=TradeView(coin),)
+            embed.add_field(name="Direction",   value=direction,                         inline=True)
+            embed.add_field(name="Entry",        value=f"`{result['fill_price']:,.4f}`",  inline=True)
+            embed.add_field(name="Stop-Loss",    value=f"`{sl:,.4f}`",                    inline=True)
+            embed.add_field(name="Take-Profit",  value=f"`{calc['tp']:,.4f}`",            inline=True)
+            embed.add_field(name="Size",         value=f"{size} {coin}",                 inline=True)
+            embed.add_field(name="Risque",       value=f"${calc['risk_usd']:,.2f}",       inline=True)
+            embed.add_field(name="Levier",       value=f"{calc['leverage']}x",            inline=True)
+            await interaction.followup.send(embed=embed, view=TradeView(coin))
         else:
-            await interaction.followup.send(f"❌ Erreur : {result.get('error')}",)
+            await interaction.followup.send(f"❌ Erreur : {result.get('error')}")
 
     except Exception as e:
-        await interaction.followup.send(f"❌ Exception : {e}",)
+        await interaction.followup.send(f"❌ Exception : {e}")
 
 @bot.tree.command(name="preset", description="Applique la config de base avec capital = solde HL actuel")
 async def preset(interaction: discord.Interaction):
@@ -432,9 +431,7 @@ async def preset(interaction: discord.Interaction):
         from config_manager import load, save
 
         loop    = asyncio.get_running_loop()
-        balance = await asyncio.wait_for(
-            loop.run_in_executor(None, hl.get_balance), timeout=8.0
-        )
+        balance = await asyncio.wait_for(loop.run_in_executor(None, hl.get_balance), timeout=8.0)
         cfg = load()
         cfg["capital"]    = round(balance, 2)
         cfg["risk_pct"]   = 5.0

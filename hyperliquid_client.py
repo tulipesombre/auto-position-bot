@@ -320,11 +320,10 @@ def close_position(coin: str) -> dict:
 def get_mid_price(coin: str) -> float:
     _, info, _ = _clients()
     mids = info.all_mids()
-
     # Crypto perps
     if coin in mids:
         return float(mids[coin])
-
-    # TradFi spot via @N
+    # TradFi — prix doit être fourni manuellement
     if coin in TRADFI_COINS:
-    raise KeyError(f"Coin '{coin}' est TradFi — spécifie le prix entry manuellement")
+        raise KeyError(f"Coin '{coin}' est TradFi — spécifie le prix entry manuellement")
+    raise KeyError(f"Coin '{coin}' introuvable sur Hyperliquid")

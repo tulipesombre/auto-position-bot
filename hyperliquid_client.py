@@ -196,3 +196,9 @@ def get_mid_price(coin: str) -> float:
     _, info, _ = _clients()
     mids = info.all_mids()
     return float(mids[coin])
+
+def get_mid_price(coin: str) -> float:
+    _, info, _ = _clients()
+    mids = info.all_mids()
+    logger.info(f"Clés mids disponibles: {[k for k in mids.keys() if 'SIL' in k.upper() or 'GOLD' in k.upper() or 'OIL' in k.upper()]}")
+    return float(mids[coin])

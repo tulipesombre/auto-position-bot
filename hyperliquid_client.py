@@ -212,7 +212,7 @@ def _open_trade_perp(coin: str, is_long: bool, size: float, leverage: int,
     lev_result = exchange.update_leverage(leverage, coin, is_cross=False)
     logger.info(f"Levier {coin}: {lev_result}")
 
-    market_result = exchange.market_open(coin, is_long, size, slippage=0.01)
+    market_result = exchange.market_open(coin, is_long, size, slippage=0.003)
     logger.info(f"Market open {coin}: {market_result}")
 
     if not market_result or market_result.get("status") != "ok":
@@ -274,7 +274,7 @@ def _open_trade_hip3(coin: str, is_long: bool, size: float, leverage: int,
     lev_result = exchange.update_leverage(leverage, hip3_coin, is_cross=False)
     logger.info(f"Levier HIP-3 {coin} ({hip3_coin}): {lev_result}")
 
-    market_result = exchange.market_open(hip3_coin, is_long, size, slippage=0.01)
+    market_result = exchange.market_open(hip3_coin, is_long, size, slippage=0.003)
     logger.info(f"Market open HIP-3 {coin} ({hip3_coin}): {market_result}")
 
     if not market_result or market_result.get("status") != "ok":
